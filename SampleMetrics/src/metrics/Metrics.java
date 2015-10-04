@@ -1,6 +1,7 @@
 package metrics;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -45,10 +46,11 @@ public class Metrics {
 		// ///
 		// }
 
-		final ExecutorService service = Executors.newFixedThreadPool(4);
-
+		final ExecutorService service = Executors.newFixedThreadPool(10);
+//		service.
 		final BlockingQueue<List<Object[]>> queue = new LinkedBlockingQueue<List<Object[]>>(
 				QUEUE_CAPACITY);
+		List<Object[]> poisonPill = Collections.emptyList();
 		
 		final Semaphore sem = new Semaphore(6);
 
@@ -62,6 +64,9 @@ public class Metrics {
 
 					try {
 						final List<Object[]> tmpPairs = queue.take();
+						if (tmpPairs.isEmpty()) {
+							return;
+						}
 						
 						sem.acquire();
 						
@@ -73,7 +78,7 @@ public class Metrics {
 								int sum = 0;
 
 //								try {
-//									Thread.sleep(8000);
+//									Thread.sleep(1000);
 //								} catch (InterruptedException e) {
 //									e.printStackTrace();
 //								}
@@ -101,6 +106,11 @@ public class Metrics {
 
 		for (final Record record : data) {
 			final Reference ref = sequence.getRef(record);
+//			try {
+//				Thread.sleep(1000);
+//			} catch (InterruptedException e) {
+//				e.printStackTrace();
+//			}
 
 			pairs.add(new Object[] { record, ref });
 
@@ -121,11 +131,19 @@ public class Metrics {
 			pairs = new ArrayList<>(MAX_PAIRS);
 
 		}
+		try {
+			queue.put(poisonPill);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 
 		service.shutdown();
 
 		try {
 			service.awaitTermination(1, TimeUnit.DAYS);
+
+
+
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
